@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Block, Inc.
+ * Copyright (C) 2025 Square, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,16 +12,25 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-package okhttp.android.test
+package okhttp3.internal.http
 
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import okhttp3.RequestBody
+import okio.BufferedSink
+import okio.GzipSink
+import okio.buffer
 
-@RunWith(RobolectricTestRunner::class)
-@Config(
-  sdk = [21, 26, 30, 33, 35],
-)
-class RobolectricOkHttpClientTest : BaseOkHttpClientUnitTest()
+internal class GzipRequestBody(
+  val delegate: RequestBody,
+) : RequestBody() {
+  override fun contentType() = delegate.contentType()
+
+  // We don't know the compressed length in advance!
+  override fun contentLength() = -1L
+
+  override fun writeTo(sink: BufferedSink) {
+    GzipSink(sink).buffer().use(delegate::writeTo)
+  }
+
+  override fun isOneShot() = delegate.isOneShot()
+}
