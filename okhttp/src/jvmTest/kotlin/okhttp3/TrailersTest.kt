@@ -31,14 +31,15 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTime
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
-import mockwebserver3.SocketPolicy
+import mockwebserver3.SocketEffect.CloseSocket
+import mockwebserver3.SocketEffect.ShutdownConnection
+import mockwebserver3.junit5.StartStop
 import okhttp3.Headers.Companion.headersOf
 import okhttp3.testing.PlatformRule
 import okio.IOException
 import okio.Path.Companion.toPath
 import okio.fakefilesystem.FakeFileSystem
 import okio.use
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -55,18 +56,14 @@ open class TrailersTest {
   @RegisterExtension
   val clientTestRule = OkHttpClientTestRule()
 
-  private lateinit var server: MockWebServer
+  @StartStop
+  private val server = MockWebServer()
 
   private var client =
     clientTestRule
       .newClientBuilder()
       .cache(Cache(fileSystem, "/cache/".toPath(), Long.MAX_VALUE))
       .build()
-
-  @BeforeEach
-  fun setUp(server: MockWebServer) {
-    this.server = server
-  }
 
   @Test
   fun trailersHttp1() {
@@ -254,7 +251,7 @@ open class TrailersTest {
         .Builder()
         .trailers(headersOf("t1", "v2"))
         .body(protocol, "Hello")
-        .socketPolicy(SocketPolicy.DisconnectDuringResponseBody)
+        .onResponseBody(CloseSocket())
         .build(),
     )
 
@@ -365,7 +362,7 @@ open class TrailersTest {
         .Builder()
         .body("Hello")
         .removeHeader("Content-Length")
-        .socketPolicy(SocketPolicy.DisconnectAtEnd)
+        .onResponseEnd(ShutdownConnection)
         .build(),
     )
 
