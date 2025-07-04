@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Square, Inc.
+ * Copyright (C) 2022 Block, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package okhttp3.nativeimage
+package mockwebserver3
 
-import org.graalvm.nativeimage.hosted.Feature
+import okio.Socket
 
-class TestRegistration : Feature {
-  override fun beforeAnalysis(access: Feature.BeforeAnalysisAccess) {
-  }
+/**
+ * Handles a call's request and response streams directly. Use this instead of [MockResponseBody] to
+ * begin sending response data before all request data has been received.
+ *
+ * See [okhttp3.RequestBody.isDuplex].
+ */
+public interface SocketHandler {
+  public fun handle(socket: Socket)
 }

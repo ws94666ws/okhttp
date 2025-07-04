@@ -43,9 +43,8 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertFailsWith
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
-import mockwebserver3.SocketPolicy.DisconnectDuringRequestBody
-import mockwebserver3.SocketPolicy.DisconnectDuringResponseBody
-import mockwebserver3.SocketPolicy.FailHandshake
+import mockwebserver3.SocketEffect.CloseSocket
+import mockwebserver3.junit5.StartStop
 import okhttp3.CallEvent.CallEnd
 import okhttp3.CallEvent.CallFailed
 import okhttp3.CallEvent.CallStart
@@ -99,7 +98,10 @@ class EventListenerTest {
 
   @RegisterExtension
   val clientTestRule = OkHttpClientTestRule()
-  private lateinit var server: MockWebServer
+
+  @StartStop
+  private val server = MockWebServer()
+
   private val listener: RecordingEventListener = RecordingEventListener()
   private val handshakeCertificates = platform.localhostHandshakeCertificates()
   private var client =
@@ -111,8 +113,7 @@ class EventListenerTest {
   private var cache: Cache? = null
 
   @BeforeEach
-  fun setUp(server: MockWebServer) {
-    this.server = server
+  fun setUp() {
     platform.assumeNotOpenJSSE()
     listener.forbidLock(get(client.connectionPool))
     listener.forbidLock(client.dispatcher)
@@ -321,7 +322,7 @@ class EventListenerTest {
         .Builder()
         .body("0123456789")
         .throttleBody(2, 100, TimeUnit.MILLISECONDS)
-        .socketPolicy(DisconnectDuringResponseBody)
+        .onResponseBody(CloseSocket())
         .build(),
     )
     client =
@@ -853,7 +854,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(FailHandshake)
+        .failHandshake()
         .build(),
     )
     val call =
@@ -885,7 +886,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(FailHandshake)
+        .failHandshake()
         .build(),
     )
     server.enqueue(MockResponse())
@@ -916,7 +917,7 @@ class EventListenerTest {
     client =
       client
         .newBuilder()
-        .proxy(server.toProxyAddress())
+        .proxy(server.proxyAddress)
         .build()
     val call =
       client.newCall(
@@ -935,7 +936,7 @@ class EventListenerTest {
     assertThat(connectStart.call).isSameAs(call)
     assertThat(connectStart.inetSocketAddress).isEqualTo(expectedAddress)
     assertThat(connectStart.proxy).isEqualTo(
-      server.toProxyAddress(),
+      server.proxyAddress,
     )
     val connectEnd = listener.removeUpToEvent<CallEvent.ConnectEnd>()
     assertThat(connectEnd.call).isSameAs(call)
@@ -1001,7 +1002,7 @@ class EventListenerTest {
     client =
       client
         .newBuilder()
-        .proxy(server.toProxyAddress())
+        .proxy(server.proxyAddress)
         .proxyAuthenticator(RecordingOkAuthenticator("password", "Basic"))
         .build()
     val call =
@@ -1048,7 +1049,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(FailHandshake)
+        .failHandshake()
         .build(),
     )
     val call =
@@ -1081,7 +1082,7 @@ class EventListenerTest {
     client =
       client
         .newBuilder()
-        .proxy(server.toProxyAddress())
+        .proxy(server.proxyAddress)
         .build()
     val call =
       client.newCall(
@@ -1106,7 +1107,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(FailHandshake)
+        .failHandshake()
         .build(),
     )
     server.enqueue(MockResponse())
@@ -1306,7 +1307,7 @@ class EventListenerTest {
       MockResponse
         .Builder()
         .body(Buffer().write(ByteArray(responseBodySize)))
-        .socketPolicy(DisconnectDuringResponseBody)
+        .onResponseBody(CloseSocket())
         .build(),
     )
     val call =
@@ -1336,7 +1337,7 @@ class EventListenerTest {
         .Builder()
         .body("")
         .bodyDelay(1, TimeUnit.SECONDS)
-        .socketPolicy(DisconnectDuringResponseBody)
+        .onResponseBody(CloseSocket())
         .build(),
     )
     val call =
@@ -1415,7 +1416,7 @@ class EventListenerTest {
         .Builder()
         .body("abc")
         .bodyDelay(1, TimeUnit.SECONDS)
-        .socketPolicy(DisconnectDuringResponseBody)
+        .onResponseBody(CloseSocket())
         .build(),
     )
     val call =
@@ -1472,7 +1473,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(DisconnectDuringRequestBody)
+        .onRequestBody(CloseSocket())
         .build(),
     )
     val request = NonCompletingRequestBody()
@@ -1546,7 +1547,7 @@ class EventListenerTest {
     server.enqueue(
       MockResponse
         .Builder()
-        .socketPolicy(DisconnectDuringRequestBody)
+        .onRequestBody(CloseSocket())
         .build(),
     )
     val call =
@@ -1890,6 +1891,7 @@ class EventListenerTest {
   @Test
   fun redirectUsingNewConnectionEventSequence() {
     val otherServer = MockWebServer()
+    otherServer.start()
     server.enqueue(
       MockResponse
         .Builder()
@@ -1937,6 +1939,7 @@ class EventListenerTest {
     assertThat(listener.findEvent<FollowUpDecision>()).all {
       prop(FollowUpDecision::nextRequest).isNotNull()
     }
+    otherServer.close()
   }
 
   @Test
@@ -1983,8 +1986,8 @@ class EventListenerTest {
       "ConnectionReleased",
       "CallEnd",
     )
-    assertThat(server.takeRequest().sequenceNumber).isEqualTo(0)
-    assertThat(server.takeRequest().sequenceNumber).isEqualTo(1)
+    assertThat(server.takeRequest().exchangeIndex).isEqualTo(0)
+    assertThat(server.takeRequest().exchangeIndex).isEqualTo(1)
   }
 
   @Test
