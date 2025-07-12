@@ -1,11 +1,11 @@
 @file:Suppress("UnstableApiUsage")
 
-import aQute.bnd.gradle.BundleTaskExtension
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSniffer
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
   kotlin("multiplatform")
@@ -268,10 +268,23 @@ afterEvaluate {
       // Work around robolectric requirements and limitations
       // https://cs.android.com/android-studio/platform/tools/base/+/mirror-goog-studio-main:build-system/gradle-core/src/main/java/com/android/build/gradle/tasks/factory/AndroidUnitTest.java;l=339
       allJvmArgs = allJvmArgs.filter { !it.startsWith("--add-opens") }
+    }
+    if (name.matches("test.*UnitTest".toRegex()) && javaLauncher.get().metadata.languageVersion.asInt() < 17) {
+      // Work around robolectric requirements and limitations
+      // https://github.com/robolectric/robolectric/issues/10419
       filter {
         excludeTest("okhttp3.internal.publicsuffix.PublicSuffixDatabaseTest", null)
       }
     }
+  }
+}
+
+// Work around issue 8826, where the Sentry SDK assumes that OkHttp's internal-visibility symbols
+// will be suffixed '$okhttp' in deployable artifacts. This isn't intended to be a published API,
+// but it's easy enough for us to keep it working. https://github.com/square/okhttp/issues/8826
+tasks.withType<KotlinCompile> {
+  compilerOptions {
+    freeCompilerArgs = listOf("-module-name=okhttp")
   }
 }
 

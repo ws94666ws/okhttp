@@ -52,7 +52,7 @@ configure<SpotlessExtension> {
 
 allprojects {
   group = "com.squareup.okhttp3"
-  version = "5.0.0-SNAPSHOT"
+  version = "5.2.0-SNAPSHOT"
 
   repositories {
     mavenCentral()
@@ -247,24 +247,7 @@ subprojects {
   }
 }
 
-// Opt-in to @ExperimentalOkHttpApi everywhere.
 subprojects {
-  plugins.withId("org.jetbrains.kotlin.jvm") {
-    kotlinExtension.sourceSets.configureEach {
-      languageSettings.optIn("okhttp3.ExperimentalOkHttpApi")
-    }
-  }
-  plugins.withId("org.jetbrains.kotlin.multiplatform") {
-    kotlinExtension.sourceSets.configureEach {
-      languageSettings.optIn("okhttp3.ExperimentalOkHttpApi")
-    }
-  }
-  plugins.withId("org.jetbrains.kotlin.android") {
-    kotlinExtension.sourceSets.configureEach {
-      languageSettings.optIn("okhttp3.ExperimentalOkHttpApi")
-    }
-  }
-
   // From https://www.liutikas.net/2025/01/12/Kotlin-Library-Friends.html
 
     // Create configurations we can use to track friend libraries
@@ -334,7 +317,7 @@ subprojects {
 
   plugins.withId("com.vanniktech.maven.publish.base") {
     configure<MavenPublishBaseExtension> {
-      publishToMavenCentral(SonatypeHost.S01, automaticRelease = true)
+      publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL, automaticRelease = true)
       signAllPublications()
       pom {
         name.set(project.name)
